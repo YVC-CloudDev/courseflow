@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CourseFlow — Student Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+        </svg>
+      </div>
+      <span class="logo-text">CourseFlow</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="nav-label">Navigation</span>
+      <a href="#" class="nav-item active" data-view="dashboard">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </a>
+      <a href="#" class="nav-item" data-view="courses">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        My Courses
+      </a>
+      
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-pill">
+        <div class="user-avatar">S</div>
+        <div class="user-info">
+          <span class="user-name">Student</span>
+          <span class="user-role">Spring 2025</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-wrapper">
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="menu-toggle" id="menuToggle" aria-label="Toggle sidebar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div class="page-breadcrumb">
+          <span id="pageTitle">Dashboard</span>
+        </div>
+      </div>
+     <div class="topbar-right">
+  <button class="btn-ghost" id="openAddAssignmentModal">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/>
+      <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Add Assignment
+  </button>
+
+  <button class="btn-primary" id="openAddCourseModal">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/>
+      <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Add Course
+  </button>
+</div>
+    </header>
+
+    <!-- PAGE: DASHBOARD -->
+    <main class="page-content" id="view-dashboard">
+
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Good to see you 👋</h1>
+          <p class="section-sub">Track your courses and assignments all in one place.</p>
+        </div>
+      </div>
+
+      <!-- STATS STRIP -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon stat-icon--blue">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          </div>
+          <div class="stat-body">
+            <span class="stat-value" id="stat-courses">0</span>
+            <span class="stat-label">Total Courses</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon--indigo">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <div class="stat-body">
+            <span class="stat-value" id="stat-total">0</span>
+            <span class="stat-label">Total Assignments</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon--amber">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="stat-body">
+            <span class="stat-value" id="stat-open">0</span>
+            <span class="stat-label">Open</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon--green">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <div class="stat-body">
+            <span class="stat-value" id="stat-done">0</span>
+            <span class="stat-label">Completed</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROGRESS BAR -->
+      <div class="progress-section" id="progress-section">
+        <div class="progress-header">
+          <span class="progress-label">Overall Progress</span>
+          <span class="progress-pct" id="progress-pct">0%</span>
+        </div>
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progress-bar"></div>
+        </div>
+      </div>
+
+        <!-- COURSES ON DASHBOARD -->
+    <div class="section-header" style="margin-top: 2.5rem;">
+        <h2 class="section-title-sm">Recent Assignments</h2>
+    </div>
+
+
+    <div class="recent-list" id="recent-assignments-list">
+        <!-- injected by JS -->
+    </div>
+
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        </div>
+        <p class="empty-title">No courses yet</p>
+        <p class="empty-sub">Add your first course to get started tracking assignments.</p>
+        <button class="btn-primary" id="emptyAddCourse">Add your first course</button>
+      </div>
+
+    </main>
+
+    <!-- PAGE: COURSES (full) -->
+    <main class="page-content hidden" id="view-courses">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">My Courses</h1>
+          <p class="section-sub">All courses and their assignments.</p>
+        </div>
+      </div>
+      <div class="courses-list" id="courses-list">
+        <!-- injected by JS -->
+      </div>
+    </main>
+
+
+
+
+  <!-- MODAL: Add Course -->
+  <div class="modal-overlay hidden" id="modal-course">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Add New Course</h2>
+        <button class="modal-close" data-close="modal-course">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label" for="course-name">Course Name</label>
+        <input class="form-input" id="course-name" type="text" placeholder="e.g. Cloud Development" maxlength="60" />
+        <label class="form-label" for="course-code">Course Code <span class="optional">(optional)</span></label>
+        <input class="form-input" id="course-code" type="text" placeholder="e.g. CS-301" maxlength="20" />
+        <label class="form-label" for="course-color">Accent Color</label>
+        <div class="color-picker" id="color-picker">
+          <button class="color-swatch active" data-color="#6366f1" style="background:#6366f1"></button>
+          <button class="color-swatch" data-color="#3b82f6" style="background:#3b82f6"></button>
+          <button class="color-swatch" data-color="#10b981" style="background:#10b981"></button>
+          <button class="color-swatch" data-color="#f59e0b" style="background:#f59e0b"></button>
+          <button class="color-swatch" data-color="#ef4444" style="background:#ef4444"></button>
+          <button class="color-swatch" data-color="#8b5cf6" style="background:#8b5cf6"></button>
+          <button class="color-swatch" data-color="#06b6d4" style="background:#06b6d4"></button>
+          <button class="color-swatch" data-color="#ec4899" style="background:#ec4899"></button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" data-close="modal-course">Cancel</button>
+        <button class="btn-primary" id="saveCourse">Add Course</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Add Assignment -->
+  <div class="modal-overlay hidden" id="modal-assignment">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Add Assignment</h2>
+        <button class="modal-close" data-close="modal-assignment">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label" for="assign-course">Course</label>
+        <select class="form-input" id="assign-course"></select>
+
+        <label class="form-label" for="assign-title">Assignment Title</label>
+        <input class="form-input" id="assign-title" type="text" placeholder="e.g. Final project presentation" maxlength="80" />
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="assign-deadline">Deadline</label>
+            <input class="form-input" id="assign-deadline" type="date" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="assign-priority">Priority</label>
+            <select class="form-input" id="assign-priority">
+              <option value="Low">Low</option>
+              <option value="Medium" selected>Medium</option>
+              <option value="High">High</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" data-close="modal-assignment">Cancel</button>
+        <button class="btn-primary" id="saveAssignment">Add Assignment</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
