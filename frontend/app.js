@@ -1,430 +1,606 @@
 'use strict';
+
+const API_BASE_URL = 'https://073nr9xy3a.execute-api.us-east-1.amazonaws.com';
+
+
+
 let courses = [];
 let assignments = [];
-// ---- ID generator (replace with backend-generated IDs later) ----
-function genId() {
-  return '_' + Math.random().toString(36).slice(2, 10);
-}
 
-// ---- Data helpers (thin wrappers — swap for fetch() calls later) ----
-function getCourses()                        { return courses; }
-function getCourseById(id)                   { return courses.find(c => c.id === id); }
-function addCourse(course)                   { courses.push(course); }
-function getAssignmentsByCourse(courseId)    { return assignments.filter(a => a.courseId === courseId); }
-function getAllAssignments()                 { return assignments; }
-function addAssignment(assign)              { assignments.push(assign); }
-function deleteAssignment(id)               { assignments = assignments.filter(a => a.id !== id); }
-function updateAssignmentStatus(id, status) {
-  const a = assignments.find(a => a.id === id);
-  if (a) a.status = status;
-}
-
-// ============================================================
-// STATE
-// ============================================================
-
-let currentView   = 'dashboard';
+let currentView = 'dashboard';
 let selectedColor = '#6366f1';
 
-// ============================================================
-// ROUTER
-// ============================================================
+/* ============================================================
+   API HELPERS
+   ============================================================ */
+
+async function apiRequest(path, options = {}) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    ...options
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'API request failed');
+  }
+
+  return data;
+}
+
+async function loadDataFromApi() {
+  try {
+    courses = await apiRequest('/courses');
+    assignments = await apiRequest('/assignments');
+
+    render();
+  } catch (error) {
+    console.error('Failed to load data from API:', error);
+    showToast('Failed to load data from AWS API', true);
+  }
+}
+
+/* ============================================================
+   DATA HELPERS
+   ============================================================ */
+
+function getCourses() {
+  return courses;
+}
+
+function getCourseById(id) {
+  return courses.find(course => course.id === id);
+}
+
+function getAssignmentsByCourse(courseId) {
+  return assignments.filter(assignment => assignment.courseId === courseId);
+}
+
+function getAllAssignments() {
+  return assignments;
+}
+
+/* ============================================================
+   ROUTER
+   ============================================================ */
 
 function navigateTo(view) {
   currentView = view;
 
-  document.querySelectorAll('.page-content').forEach(el => el.classList.add('hidden'));
-  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.page-content').forEach(page => {
+    page.classList.add('hidden');
+  });
 
-  const viewEl = document.getElementById(`view-${view}`);
-  if (viewEl) viewEl.classList.remove('hidden');
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.classList.remove('active');
+  });
 
-  const navEl = document.querySelector(`.nav-item[data-view="${view}"]`);
-  if (navEl) navEl.classList.add('active');
+  const viewElement = document.getElementById(`view-${view}`);
+  if (viewElement) {
+    viewElement.classList.remove('hidden');
+  }
 
-  const titles = { dashboard: 'Dashboard', courses: 'My Courses' };
-  document.getElementById('pageTitle').textContent = titles[view] || '';
+  const navElement = document.querySelector(`.nav-item[data-view="${view}"]`);
+  if (navElement) {
+    navElement.classList.add('active');
+  }
+
+  const titles = {
+    dashboard: 'Dashboard',
+    courses: 'My Courses'
+  };
+
+  const pageTitle = document.getElementById('pageTitle');
+  if (pageTitle) {
+    pageTitle.textContent = titles[view] || '';
+  }
 
   render();
 }
 
-// ============================================================
-// RENDER ENGINE
-// ============================================================
+/* ============================================================
+   RENDER ENGINE
+   ============================================================ */
 
 function render() {
   renderStats();
   renderProgress();
 
   if (currentView === 'dashboard') {
-    renderDashboardCourses();
-  } else if (currentView === 'courses') {
+    renderDashboard();
+  }
+
+  if (currentView === 'courses') {
     renderCoursesPage();
   }
 }
 
-// ---- Stats ----
+/* =========================
+   STATS
+   ========================= */
+
 function renderStats() {
-  const all   = getAllAssignments();
-  const open  = all.filter(a => a.status === 'Open').length;
-  const done  = all.filter(a => a.status === 'Done').length;
+  const allAssignments = getAllAssignments();
+  const openAssignments = allAssignments.filter(item => item.status === 'Open').length;
+  const doneAssignments = allAssignments.filter(item => item.status === 'Done').length;
 
-  document.getElementById('stat-courses').textContent = getCourses().length;
-  document.getElementById('stat-total').textContent   = all.length;
-  document.getElementById('stat-open').textContent    = open;
-  document.getElementById('stat-done').textContent    = done;
+  setTextContent('stat-courses', getCourses().length);
+  setTextContent('stat-total', allAssignments.length);
+  setTextContent('stat-open', openAssignments);
+  setTextContent('stat-done', doneAssignments);
 }
 
-// ---- Progress bar ----
 function renderProgress() {
-  const all  = getAllAssignments();
-  const done = all.filter(a => a.status === 'Done').length;
-  const pct  = all.length === 0 ? 0 : Math.round((done / all.length) * 100);
+  const allAssignments = getAllAssignments();
+  const doneAssignments = allAssignments.filter(item => item.status === 'Done').length;
 
-  document.getElementById('progress-pct').textContent = pct + '%';
-  document.getElementById('progress-bar').style.width  = pct + '%';
+  const progressPercent =
+    allAssignments.length === 0
+      ? 0
+      : Math.round((doneAssignments / allAssignments.length) * 100);
+
+  setTextContent('progress-pct', `${progressPercent}%`);
+
+  const progressBar = document.getElementById('progress-bar');
+  if (progressBar) {
+    progressBar.style.width = `${progressPercent}%`;
+  }
 }
 
-// ---- Dashboard: course cards ----
-function renderDashboardCourses() {
-  const list = document.getElementById('recent-assignments-list');
-  const empty = document.getElementById('empty-state');
+/* =========================
+   DASHBOARD
+   ========================= */
 
-  const recent = getAllAssignments().slice(-5).reverse();
+function renderDashboard() {
+  const recentList = document.getElementById('recent-assignments-list');
+  const emptyState = document.getElementById('empty-state');
 
-  if (recent.length === 0) {
-    list.innerHTML = '';
-    empty.classList.remove('hidden');
+  if (!recentList || !emptyState) {
     return;
   }
 
-  empty.classList.add('hidden');
+  const recentAssignments = getAllAssignments().slice(-5).reverse();
 
-  list.innerHTML = recent.map(a => {
-    const course = getCourseById(a.courseId);
-    const statusClass = a.status === 'Open' ? 'status-open'
-      : a.status === 'In Progress' ? 'status-inprogress'
-      : 'status-done';
+  if (recentAssignments.length === 0) {
+    recentList.innerHTML = '';
+    emptyState.classList.remove('hidden');
+    return;
+  }
+
+  emptyState.classList.add('hidden');
+
+  recentList.innerHTML = recentAssignments.map(assignment => {
+    const course = getCourseById(assignment.courseId);
+    const statusClass = getStatusClass(assignment.status);
 
     return `
       <div class="recent-item">
         <div>
-          <div class="recent-title">${escHtml(a.title)}</div>
-          <div class="recent-meta">${escHtml(course ? course.name : 'Unknown Course')} · ${formatDate(a.deadline)}</div>
+          <div class="recent-title">${escapeHtml(assignment.title)}</div>
+          <div class="recent-meta">
+            ${escapeHtml(course ? course.name : 'Unknown Course')} · ${formatDate(assignment.deadline)}
+          </div>
         </div>
 
         <div class="assign-badges">
-          <span class="priority-badge ${a.priority}">${a.priority}</span>
-          <span class="status-select ${statusClass}">${a.status}</span>
+          <span class="priority-badge ${escapeHtml(assignment.priority)}">
+            ${escapeHtml(assignment.priority)}
+          </span>
+          <span class="status-select ${statusClass}">
+            ${escapeHtml(assignment.status)}
+          </span>
         </div>
       </div>
     `;
   }).join('');
 }
 
-function buildCourseCard(course) {
-  const tasks   = getAssignmentsByCourse(course.id);
-  const open    = tasks.filter(a => a.status !== 'Done').length;
-  const done    = tasks.filter(a => a.status === 'Done').length;
-  const initials = course.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+/* =========================
+   COURSES PAGE
+   ========================= */
 
-  return `
-    <div class="course-card">
-      <div class="card-accent-bar" style="background:${course.color}"></div>
-      <div class="card-body">
-        <div class="card-header-row">
-          <div class="card-course-icon" style="background:${course.color}">${initials}</div>
-          <div class="card-meta">
-            <div class="card-title">${escHtml(course.name)}</div>
-            ${course.code ? `<div class="card-code">${escHtml(course.code)}</div>` : ''}
-          </div>
-        </div>
-        <div class="card-stats-row">
-          <span class="card-stat-pill">${tasks.length} task${tasks.length !== 1 ? 's' : ''}</span>
-          <span class="card-stat-pill">${open} open</span>
-          <span class="card-stat-pill">${done} done</span>
-        </div>
-        <button class="card-add-task-btn" data-course-id="${course.id}">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add assignment
-        </button>
-      </div>
-    </div>
-  `;
-}
-
-// ---- Courses page: full sections ----
 function renderCoursesPage() {
   const list = document.getElementById('courses-list');
-  const cs   = getCourses();
 
-  if (cs.length === 0) {
+  if (!list) {
+    return;
+  }
+
+  if (courses.length === 0) {
     list.innerHTML = buildEmptySection('No courses yet. Add your first course above.');
     return;
   }
 
-  list.innerHTML = cs.map(c => buildCourseSection(c, true)).join('');
-  attachSectionHandlers(list);
+  list.innerHTML = courses.map(course => buildCourseSection(course)).join('');
+  attachCourseSectionHandlers(list);
 }
 
+function buildCourseSection(course) {
+  const courseAssignments = getAssignmentsByCourse(course.id);
+  const taskRows = courseAssignments.map(assignment => buildAssignmentRow(assignment)).join('');
 
-
-// ---- Build a course section (used in both course & assignment views) ----
-function buildCourseSection(course, showAddBtn) {
-  const tasks = getAssignmentsByCourse(course.id);
-
-  const taskRows = tasks.map(a => buildAssignmentRow(a)).join('');
-
-  const addRow = showAddBtn ? `
-    <div class="add-assignment-row" data-course-id="${course.id}" style="${tasks.length > 0 ? 'border-top: 1px solid var(--border);' : ''}">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      Add assignment
-    </div>
-  ` : '';
-
-  const emptyMsg = tasks.length === 0
+  const emptyMessage = courseAssignments.length === 0
     ? `<div style="padding: 18px 0; color: var(--text-muted); font-size: 0.8rem;">No assignments yet.</div>`
     : '';
 
   return `
     <div class="course-section">
       <div class="course-section-header">
-        <div class="section-accent-dot" style="background:${course.color}"></div>
-        <span class="section-course-name">${escHtml(course.name)}</span>
-        ${course.code ? `<span class="section-course-code">${escHtml(course.code)}</span>` : ''}
-        <span class="section-task-count">${tasks.length} task${tasks.length !== 1 ? 's' : ''}</span>
+        <div class="section-accent-dot" style="background:${escapeHtml(course.color || '#6366f1')}"></div>
+        <span class="section-course-name">${escapeHtml(course.name)}</span>
+        ${course.code ? `<span class="section-course-code">${escapeHtml(course.code)}</span>` : ''}
+        <span class="section-task-count">
+          ${courseAssignments.length} task${courseAssignments.length !== 1 ? 's' : ''}
+        </span>
       </div>
+
       <div class="course-section-body">
-        ${emptyMsg}
+        ${emptyMessage}
         ${taskRows}
       </div>
-      ${addRow}
+
+      <div class="add-assignment-row" data-course-id="${escapeHtml(course.id)}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Add assignment
+      </div>
     </div>
   `;
 }
 
-// ---- Build a single assignment row ----
-function buildAssignmentRow(a) {
-  const isDone     = a.status === 'Done';
-  const statusClass = a.status === 'Open' ? 'status-open'
-                    : a.status === 'In Progress' ? 'status-inprogress'
-                    : 'status-done';
-
-  const today      = new Date().toISOString().split('T')[0];
-  const overdue    = a.deadline && a.deadline < today && a.status !== 'Done';
-  const deadlineTxt = a.deadline ? formatDate(a.deadline) : '—';
+function buildAssignmentRow(assignment) {
+  const isDone = assignment.status === 'Done';
+  const statusClass = getStatusClass(assignment.status);
+  const today = new Date().toISOString().split('T')[0];
+  const overdue = assignment.deadline && assignment.deadline < today && assignment.status !== 'Done';
 
   return `
-    <div class="assignment-row" data-assignment-id="${a.id}">
-      <div class="assign-check ${isDone ? 'done' : ''}" data-toggle-done="${a.id}" title="Toggle done"></div>
+    <div class="assignment-row" data-assignment-id="${escapeHtml(assignment.id)}">
+      <div
+        class="assign-check ${isDone ? 'done' : ''}"
+        data-toggle-done="${escapeHtml(assignment.id)}"
+        title="Toggle done">
+      </div>
+
       <div class="assign-info">
-        <div class="assign-title ${isDone ? 'strikethrough' : ''}">${escHtml(a.title)}</div>
+        <div class="assign-title ${isDone ? 'strikethrough' : ''}">
+          ${escapeHtml(assignment.title)}
+        </div>
         <div class="assign-deadline ${overdue ? 'overdue' : ''}">
-          ${overdue ? '⚠ ' : ''}${deadlineTxt}
+          ${overdue ? '⚠ ' : ''}${formatDate(assignment.deadline)}
         </div>
       </div>
+
       <div class="assign-badges">
-        <select class="status-select ${statusClass}" data-status-select="${a.id}">
-          <option value="Open"        ${a.status === 'Open'        ? 'selected' : ''}>Open</option>
-          <option value="In Progress" ${a.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
-          <option value="Done"        ${a.status === 'Done'        ? 'selected' : ''}>Done</option>
+        <select class="status-select ${statusClass}" data-status-select="${escapeHtml(assignment.id)}">
+          <option value="Open" ${assignment.status === 'Open' ? 'selected' : ''}>Open</option>
+          <option value="In Progress" ${assignment.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+          <option value="Done" ${assignment.status === 'Done' ? 'selected' : ''}>Done</option>
         </select>
-        <span class="priority-badge ${a.priority}">${a.priority}</span>
+
+        <span class="priority-badge ${escapeHtml(assignment.priority)}">
+          ${escapeHtml(assignment.priority)}
+        </span>
       </div>
+
       <div class="assign-actions">
-        <button class="btn-icon btn-icon--red" data-delete-assign="${a.id}" title="Delete assignment">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        <button class="btn-icon btn-icon--red" data-delete-assign="${escapeHtml(assignment.id)}" title="Delete assignment">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14H6L5 6"/>
+            <path d="M10 11v6"/>
+            <path d="M14 11v6"/>
+            <path d="M9 6V4h6v2"/>
+          </svg>
         </button>
       </div>
     </div>
   `;
 }
 
-function buildEmptySection(msg) {
+function buildEmptySection(message) {
   return `
     <div class="empty-state">
       <div class="empty-icon">
-        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
       </div>
-      <p class="empty-title">${msg}</p>
+      <p class="empty-title">${escapeHtml(message)}</p>
     </div>
   `;
 }
 
-// ---- Attach event handlers inside a rendered list ----
-function attachSectionHandlers(container) {
-  // Add assignment from row
+/* ============================================================
+   COURSE SECTION EVENTS
+   ============================================================ */
+
+function attachCourseSectionHandlers(container) {
   container.querySelectorAll('.add-assignment-row').forEach(row => {
-    row.addEventListener('click', () => openAssignmentModal(row.dataset.courseId));
-  });
-
-  // Toggle done via circle
-  container.querySelectorAll('[data-toggle-done]').forEach(el => {
-    el.addEventListener('click', () => {
-      const id = el.dataset.toggleDone;
-      const a  = assignments.find(x => x.id === id);
-      if (!a) return;
-      a.status = a.status === 'Done' ? 'Open' : 'Done';
-      render();
+    row.addEventListener('click', () => {
+      openAssignmentModal(row.dataset.courseId);
     });
   });
 
-  // Status select
-  container.querySelectorAll('[data-status-select]').forEach(sel => {
-    sel.addEventListener('change', () => {
-      updateAssignmentStatus(sel.dataset.statusSelect, sel.value);
-      render();
-      showToast('Status updated');
+  container.querySelectorAll('[data-toggle-done]').forEach(item => {
+    item.addEventListener('click', async () => {
+      const assignmentId = item.dataset.toggleDone;
+      const assignment = assignments.find(item => item.id === assignmentId);
+
+      if (!assignment) {
+        return;
+      }
+
+      const newStatus = assignment.status === 'Done' ? 'Open' : 'Done';
+      await updateAssignmentStatusInApi(assignmentId, newStatus);
     });
   });
 
-  // Delete assignment
-  container.querySelectorAll('[data-delete-assign]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (!confirm('Delete this assignment?')) return;
-      deleteAssignment(btn.dataset.deleteAssign);
-      render();
-      showToast('Assignment deleted', true);
+  container.querySelectorAll('[data-status-select]').forEach(select => {
+    select.addEventListener('change', async () => {
+      const assignmentId = select.dataset.statusSelect;
+      const newStatus = select.value;
+
+      await updateAssignmentStatusInApi(assignmentId, newStatus);
+    });
+  });
+
+  container.querySelectorAll('[data-delete-assign]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const assignmentId = button.dataset.deleteAssign;
+
+      if (!confirm('Delete this assignment?')) {
+        return;
+      }
+
+      await deleteAssignmentFromApi(assignmentId);
     });
   });
 }
 
-// ============================================================
-// MODALS
-// ============================================================
+/* ============================================================
+   API ACTIONS
+   ============================================================ */
+
+async function createCourseInApi(courseData) {
+  const createdCourse = await apiRequest('/courses', {
+    method: 'POST',
+    body: JSON.stringify(courseData)
+  });
+
+  courses.push(createdCourse);
+  render();
+
+  return createdCourse;
+}
+
+async function createAssignmentInApi(assignmentData) {
+  const createdAssignment = await apiRequest('/assignments', {
+    method: 'POST',
+    body: JSON.stringify(assignmentData)
+  });
+
+  assignments.push(createdAssignment);
+  render();
+
+  return createdAssignment;
+}
+
+async function updateAssignmentStatusInApi(assignmentId, status) {
+  try {
+    await apiRequest(`/assignments/${assignmentId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status })
+    });
+
+    assignments = assignments.map(assignment => {
+      if (assignment.id === assignmentId) {
+        return {
+          ...assignment,
+          status
+        };
+      }
+
+      return assignment;
+    });
+
+    render();
+    showToast('Status updated');
+  } catch (error) {
+    console.error('Failed to update assignment:', error);
+    showToast('Failed to update assignment', true);
+  }
+}
+
+async function deleteAssignmentFromApi(assignmentId) {
+  try {
+    await apiRequest(`/assignments/${assignmentId}`, {
+      method: 'DELETE'
+    });
+
+    assignments = assignments.filter(assignment => assignment.id !== assignmentId);
+
+    render();
+    showToast('Assignment deleted');
+  } catch (error) {
+    console.error('Failed to delete assignment:', error);
+    showToast('Failed to delete assignment', true);
+  }
+}
+
+/* ============================================================
+   MODALS
+   ============================================================ */
 
 function openModal(id) {
-  document.getElementById(id).classList.remove('hidden');
+  const modal = document.getElementById(id);
+  if (modal) {
+    modal.classList.remove('hidden');
+  }
 }
 
 function closeModal(id) {
-  document.getElementById(id).classList.add('hidden');
+  const modal = document.getElementById(id);
+  if (modal) {
+    modal.classList.add('hidden');
+  }
 }
 
-// ---- Add Course Modal ----
 function openCourseModal() {
-  document.getElementById('course-name').value = '';
-  document.getElementById('course-code').value = '';
+  setInputValue('course-name', '');
+  setInputValue('course-code', '');
+
   selectedColor = '#6366f1';
-  document.querySelectorAll('.color-swatch').forEach(sw => {
-    sw.classList.toggle('active', sw.dataset.color === selectedColor);
+
+  document.querySelectorAll('.color-swatch').forEach(swatch => {
+    swatch.classList.toggle('active', swatch.dataset.color === selectedColor);
   });
+
   openModal('modal-course');
-  setTimeout(() => document.getElementById('course-name').focus(), 100);
+
+  setTimeout(() => {
+    const input = document.getElementById('course-name');
+    if (input) input.focus();
+  }, 100);
 }
 
-function saveCourse() {
-  const nameInput = document.getElementById('course-name');
-  const codeInput = document.getElementById('course-code');
-
-  const name = nameInput ? nameInput.value.trim() : '';
-  const code = codeInput ? codeInput.value.trim() : '';
+async function saveCourse() {
+  const name = getInputValue('course-name').trim();
+  const code = getInputValue('course-code').trim();
 
   if (!name) {
     showToast('Please enter a course name', true);
     return;
   }
 
-  const newCourse = {
-    id: genId(),
-    name: name,
-    code: code,
-    color: selectedColor || '#6366f1'
-  };
+  try {
+    await createCourseInApi({
+      name,
+      code,
+      color: selectedColor || '#6366f1'
+    });
 
-  addCourse(newCourse);
-
-  closeModal('modal-course');
-
-  if (nameInput) nameInput.value = '';
-  if (codeInput) codeInput.value = '';
-
-  render();
-  showToast('Course added successfully!');
+    closeModal('modal-course');
+    showToast('Course added successfully');
+  } catch (error) {
+    console.error('Failed to create course:', error);
+    showToast('Failed to add course', true);
+  }
 }
 
-// ---- Add Assignment Modal ----
 function openAssignmentModal(preselectedCourseId) {
-  // Populate course dropdown
-  const sel = document.getElementById('assign-course');
-  sel.innerHTML = getCourses()
-    .map(c => `<option value="${c.id}" ${c.id === preselectedCourseId ? 'selected' : ''}>${escHtml(c.name)}</option>`)
+  const courseSelect = document.getElementById('assign-course');
+
+  if (!courseSelect) {
+    return;
+  }
+
+  courseSelect.innerHTML = courses
+    .map(course => `
+      <option value="${escapeHtml(course.id)}" ${course.id === preselectedCourseId ? 'selected' : ''}>
+        ${escapeHtml(course.name)}
+      </option>
+    `)
     .join('');
 
-  document.getElementById('assign-title').value = '';
-  document.getElementById('assign-deadline').value = '';
-  document.getElementById('assign-priority').value = 'Medium';
+  setInputValue('assign-title', '');
+  setInputValue('assign-deadline', '');
+  setInputValue('assign-priority', 'Medium');
 
   openModal('modal-assignment');
-  setTimeout(() => document.getElementById('assign-title').focus(), 100);
+
+  setTimeout(() => {
+    const input = document.getElementById('assign-title');
+    if (input) input.focus();
+  }, 100);
 }
 
-function saveAssignment() {
-  const title    = document.getElementById('assign-title').value.trim();
-  const courseId = document.getElementById('assign-course').value;
-  const deadline = document.getElementById('assign-deadline').value;
-  const priority = document.getElementById('assign-priority').value;
+async function saveAssignment() {
+  const courseId = getInputValue('assign-course');
+  const title = getInputValue('assign-title').trim();
+  const deadline = getInputValue('assign-deadline');
+  const priority = getInputValue('assign-priority');
 
-  if (!title)    { showToast('Please enter an assignment title', true); return; }
-  if (!courseId) { showToast('Please select a course', true); return; }
+  if (!courseId) {
+    showToast('Please select a course', true);
+    return;
+  }
 
-  addAssignment({ id: genId(), courseId, title, deadline, status: 'Open', priority });
+  if (!title) {
+    showToast('Please enter an assignment title', true);
+    return;
+  }
 
-  closeModal('modal-assignment');
-  render();
-  showToast('Assignment added!');
+  try {
+    await createAssignmentInApi({
+      courseId,
+      title,
+      deadline,
+      priority,
+      status: 'Open'
+    });
+
+    closeModal('modal-assignment');
+    showToast('Assignment added successfully');
+  } catch (error) {
+    console.error('Failed to create assignment:', error);
+    showToast('Failed to add assignment', true);
+  }
 }
 
-// ============================================================
-// TOAST
-// ============================================================
+/* ============================================================
+   TOAST
+   ============================================================ */
 
 let toastTimer;
 
-function showToast(msg, warn = false) {
-  const existing = document.querySelector('.toast');
-  if (existing) existing.remove();
+function showToast(message, warn = false) {
+  const existingToast = document.querySelector('.toast');
+  if (existingToast) {
+    existingToast.remove();
+  }
+
   clearTimeout(toastTimer);
 
-  const t = document.createElement('div');
-  t.className = 'toast';
-  t.innerHTML = `<div class="toast-dot ${warn ? 'warn' : ''}"></div>${escHtml(msg)}`;
-  document.body.appendChild(t);
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = `
+    <div class="toast-dot ${warn ? 'warn' : ''}"></div>
+    ${escapeHtml(message)}
+  `;
+
+  document.body.appendChild(toast);
 
   toastTimer = setTimeout(() => {
-    t.classList.add('fade-out');
-    setTimeout(() => t.remove(), 300);
+    toast.classList.add('fade-out');
+
+    setTimeout(() => {
+      toast.remove();
+    }, 300);
   }, 2600);
 }
 
-// ============================================================
-// UTILITIES
-// ============================================================
-
-function escHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function formatDate(dateStr) {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-// ============================================================
-// SIDEBAR MOBILE TOGGLE
-// ============================================================
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
 
 function setupSidebar() {
   const sidebar = document.getElementById('sidebar');
-  const toggle  = document.getElementById('menuToggle');
+  const toggle = document.getElementById('menuToggle');
 
-  // Create overlay
+  if (!sidebar || !toggle) {
+    return;
+  }
+
   const overlay = document.createElement('div');
   overlay.className = 'sidebar-overlay';
   document.body.appendChild(overlay);
@@ -440,15 +616,15 @@ function setupSidebar() {
   });
 }
 
-// ============================================================
-// EVENT BINDING
-// ============================================================
+/* ============================================================
+   GLOBAL EVENTS
+   ============================================================ */
 
 function bindEvents() {
-  // Sidebar navigation
   document.querySelectorAll('.nav-item[data-view]').forEach(item => {
-    item.addEventListener('click', (e) => {
-      e.preventDefault();
+    item.addEventListener('click', event => {
+      event.preventDefault();
+
       navigateTo(item.dataset.view);
 
       const sidebar = document.getElementById('sidebar');
@@ -459,107 +635,144 @@ function bindEvents() {
     });
   });
 
-  // Topbar Add Course button
-  const openAddCourseBtn = document.getElementById('openAddCourseModal');
-  if (openAddCourseBtn) {
-    openAddCourseBtn.addEventListener('click', openCourseModal);
-  }
+  bindClick('openAddCourseModal', openCourseModal);
 
-  // Topbar Add Assignment button
-  const openAddAssignmentBtn = document.getElementById('openAddAssignmentModal');
-  if (openAddAssignmentBtn) {
-    openAddAssignmentBtn.addEventListener('click', () => {
-      if (getCourses().length === 0) {
-        showToast('Please add a course first', true);
-        return;
-      }
+  bindClick('openAddAssignmentModal', () => {
+    if (courses.length === 0) {
+      showToast('Please add a course first', true);
+      return;
+    }
 
-      openAssignmentModal(getCourses()[0].id);
-    });
-  }
-
-  // Dashboard Add Course button, only if it exists
-  const dashAddCourseBtn = document.getElementById('dashAddCourse');
-  if (dashAddCourseBtn) {
-    dashAddCourseBtn.addEventListener('click', openCourseModal);
-  }
-
-  // Empty state Add Course button
-  const emptyAddCourseBtn = document.getElementById('emptyAddCourse');
-  if (emptyAddCourseBtn) {
-    emptyAddCourseBtn.addEventListener('click', openCourseModal);
-  }
-
-  // Courses page Add Course button, only if it exists
-  const coursesPageAddCourseBtn = document.getElementById('coursesPageAddCourse');
-  if (coursesPageAddCourseBtn) {
-    coursesPageAddCourseBtn.addEventListener('click', openCourseModal);
-  }
-
-  // Modal close buttons
-  document.querySelectorAll('[data-close]').forEach(btn => {
-    btn.addEventListener('click', () => closeModal(btn.dataset.close));
+    openAssignmentModal(courses[0].id);
   });
 
-  // Close modal when clicking overlay
+  bindClick('emptyAddCourse', openCourseModal);
+  bindClick('saveCourse', saveCourse);
+  bindClick('saveAssignment', saveAssignment);
+
+  document.querySelectorAll('[data-close]').forEach(button => {
+    button.addEventListener('click', () => {
+      closeModal(button.dataset.close);
+    });
+  });
+
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) {
+    overlay.addEventListener('click', event => {
+      if (event.target === overlay) {
         closeModal(overlay.id);
       }
     });
   });
 
-  // Save course
-  const saveCourseBtn = document.getElementById('saveCourse');
-  if (saveCourseBtn) {
-    saveCourseBtn.addEventListener('click', saveCourse);
-  }
+  bindEnter('course-name', saveCourse);
+  bindEnter('assign-title', saveAssignment);
 
-  // Save assignment
-  const saveAssignmentBtn = document.getElementById('saveAssignment');
-  if (saveAssignmentBtn) {
-    saveAssignmentBtn.addEventListener('click', saveAssignment);
-  }
-
-  // Enter key in course modal
-  const courseNameInput = document.getElementById('course-name');
-  if (courseNameInput) {
-    courseNameInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') saveCourse();
-    });
-  }
-
-  // Enter key in assignment modal
-  const assignmentTitleInput = document.getElementById('assign-title');
-  if (assignmentTitleInput) {
-    assignmentTitleInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') saveAssignment();
-    });
-  }
-
-  // Color swatches
   const colorPicker = document.getElementById('color-picker');
+
   if (colorPicker) {
-    colorPicker.addEventListener('click', (e) => {
-      const swatch = e.target.closest('.color-swatch');
-      if (!swatch) return;
+    colorPicker.addEventListener('click', event => {
+      const swatch = event.target.closest('.color-swatch');
+
+      if (!swatch) {
+        return;
+      }
 
       selectedColor = swatch.dataset.color;
 
-      document.querySelectorAll('.color-swatch').forEach(sw => {
-        sw.classList.toggle('active', sw === swatch);
+      document.querySelectorAll('.color-swatch').forEach(item => {
+        item.classList.toggle('active', item === swatch);
       });
     });
   }
 }
 
-// ============================================================
-// INIT
-// ============================================================
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+
+function bindClick(id, handler) {
+  const element = document.getElementById(id);
+
+  if (element) {
+    element.addEventListener('click', handler);
+  }
+}
+
+function bindEnter(id, handler) {
+  const element = document.getElementById(id);
+
+  if (element) {
+    element.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        handler();
+      }
+    });
+  }
+}
+
+function getInputValue(id) {
+  const element = document.getElementById(id);
+  return element ? element.value : '';
+}
+
+function setInputValue(id, value) {
+  const element = document.getElementById(id);
+
+  if (element) {
+    element.value = value;
+  }
+}
+
+function setTextContent(id, value) {
+  const element = document.getElementById(id);
+
+  if (element) {
+    element.textContent = value;
+  }
+}
+
+function getStatusClass(status) {
+  if (status === 'Done') {
+    return 'status-done';
+  }
+
+  if (status === 'In Progress') {
+    return 'status-inprogress';
+  }
+
+  return 'status-open';
+}
+
+function formatDate(dateString) {
+  if (!dateString) {
+    return '—';
+  }
+
+  const date = new Date(`${dateString}T00:00:00`);
+
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
 
 document.addEventListener('DOMContentLoaded', () => {
   setupSidebar();
   bindEvents();
   navigateTo('dashboard');
+  loadDataFromApi();
 });
