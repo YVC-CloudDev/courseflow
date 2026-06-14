@@ -1,0 +1,35 @@
+name: Project Files Check
+
+on:
+  push:
+    branches:
+      - main
+      - feature/github-docs
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check-project-files:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check frontend files
+        run: |
+          test -f frontend/index.html
+          test -f frontend/style.css
+          test -f frontend/app.js
+          echo "Frontend files exist."
+
+      - name: Check backend file
+        run: |
+          test -f backend/lambda_function.py
+          echo "Backend Lambda file exists."
+
+      - name: Check README
+        run: |
+          test -f README.md
+          echo "README exists."
