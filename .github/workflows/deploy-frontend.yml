@@ -1,0 +1,38 @@
+name: Deploy Frontend to AWS
+
+on:
+  push:
+    branches:
+      - main
+      - feature/aws-setup
+    paths:
+      - "frontend/**"
+      - ".github/workflows/deploy-frontend.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::538379555357:role/CourseFlowGitHubActionsRole
+          aws-region: us-east-1
+
+      - name: Deploy frontend to S3
+        run: |
+          aws s3 sync frontend s3://courseflow-adyan-frontend --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id EKVXXEDUP75O6 \
+            --paths "/*"
